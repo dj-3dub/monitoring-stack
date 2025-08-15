@@ -1,26 +1,39 @@
-# Backups & bundles
-homelab-backups/
-homelab-bundles/
-homelab-image-build-*/
-restore-test-*/
-bundle/
-**/images.tar
-**/backup/
-**/certs/
-**/volumes/
-**/bind-mounts/
-**/manifests/
-
-# Secrets
-.env
-*.crt
-*.key
-*.pem
-
-# OS/editor
+# --- Generic OS/editor junk ---
 .DS_Store
 Thumbs.db
 *.swp
-scripts/add_adlists.py
-scripts/auto_patch_backup.py
-scripts/inspect_backup_image.py
+*~
+.idea/
+.vscode/
+
+# --- Git ---
+.git-credentials
+.gitconfig.local
+
+# --- Env / secrets (if used locally) ---
+.env
+.env.*
+
+# --- Rust (agent) ---
+# ignore all cargo build outputs anywhere
+**/target/
+# rust/cargo extras
+**/*.rs.bk
+
+# --- Node (if any frontends get added later) ---
+node_modules/
+
+# --- Docker / tooling ---
+docker-compose.override.yml
+*.local.yml
+
+# --- Grafana (local state if ever bind-mounted) ---
+grafana/data/
+grafana/grafana.db
+
+# --- Prometheus (local state if ever bind-mounted) ---
+prometheus/data/
+
+# --- Temp/outputs ---
+tmp/
+*.log

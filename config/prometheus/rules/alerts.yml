@@ -1,0 +1,38 @@
+groups:
+  - name: host-and-uptime
+    rules:
+      - alert: HostHighCPU
+        expr: avg(rate(node_cpu_seconds_total{mode!="idle"}[5m])) by (instance) > 0.85
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "Average CPU > 85% for 5m."
+      - alert: HostLowMemory
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.10
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Low memory on {{ $labels.instance }}"
+          description: "Less than 10% memory available for 5m."
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) < 0.10
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Less than 10% disk free for 10m on {{ $labels.mountpoint }}."
+      - alert: BlackboxHttpDown
+        expr: probe_success{job="blackbox_http"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "HTTP probe failed for {{ $labels.instance }}"
+          description: "Blackbox HTTP check failing for 2m."
+      - alert: BlackboxIcmpDown
+        expr: probe_success{job="blackbox_icmp"} == 0
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "ICMP ping failed for {{ $labels.instance }}"
+          description: "Blackbox ICMP failing for 2m."
