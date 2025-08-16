@@ -21,3 +21,6 @@ bundle/
 .DS_Store
 Thumbs.db
 *.swp
+scripts/add_adlists.py
+scripts/auto_patch_backup.py
+scripts/inspect_backup_image.py
