@@ -1,0 +1,69 @@
+{
+  "id": null,
+  "uid": "cadvisor-starter",
+  "title": "cAdvisor - Starter",
+  "tags": ["homelab","starter"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "time": {"from": "now-15m", "to": "now"},
+  "templating": {"list": []},
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Running Containers",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "count(count(container_last_seen{job=\"cadvisor\"}) by (name))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Container CPU (sum by name)",
+      "gridPos": {"h": 8, "w": 18, "x": 6, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total[5m])) * 100",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Container Memory (bytes)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "max by (name) (container_memory_working_set_bytes)",
+          "legendFormat": "{{name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Container Network Rx/Tx (bytes/s)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "fieldConfig": {"defaults": {"unit": "Bps"}, "overrides": []},
+      "targets": [
+        {
+          "expr": "sum by (name) (rate(container_network_receive_bytes_total[5m]))",
+          "legendFormat": "rx {{name}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (name) (rate(container_network_transmit_bytes_total[5m]))",
+          "legendFormat": "tx {{name}}",
+          "refId": "B"
+        }
+      ]
+    }
+  ]
+}
