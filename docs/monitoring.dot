@@ -1,0 +1,49 @@
+digraph Monitoring {
+  rankdir=LR;
+  labelloc="t";
+  label="Monitoring Stack (Prometheus • Grafana • Loki • Alertmanager)";
+  fontname="Inter,Helvetica,Arial";
+  node [shape=box, style="rounded,filled", fillcolor="#f8f9fb", color="#aab3c0", fontname="Inter,Helvetica,Arial"];
+  edge [color="#8aa1b1"];
+
+  subgraph cluster_host {
+    label="Ubuntu VM (Docker)";
+    color="#cbd5e1";
+    style="rounded";
+    fontsize=12;
+
+    Prometheus   [label="Prometheus:9090"];
+    Alertmanager [label="Alertmanager:9093"];
+    Grafana      [label="Grafana:3000"];
+    Loki         [label="Loki:3100"];
+    Promtail     [label="Promtail"];
+    NodeExp      [label="Node Exporter:9100"];
+    cAdvisor     [label="cAdvisor:8080"];
+    Blackbox     [label="Blackbox Exporter:9115"];
+  }
+
+  // Data flows
+  NodeExp   -> Prometheus [label="host metrics"];
+  cAdvisor  -> Prometheus [label="container metrics"];
+  Blackbox  -> Prometheus [label="probes"];
+  Promtail  -> Loki       [label="logs"];
+  Loki      -> Grafana    [label="logs datasource"];
+  Prometheus-> Grafana    [label="metrics datasource"];
+  Prometheus-> Alertmanager [label="alerts (rules)"];
+
+  // External user
+  User [shape=oval, label="You (Browser)", fillcolor="#eef6ff", color="#7aa2d6"];
+  User -> Grafana;
+  User -> Prometheus;
+  User -> Alertmanager;
+
+  // Optional CI/CD
+  subgraph cluster_git {
+    label="GitHub (optional CI/CD)";
+    style="rounded,dashed"; color="#e5e7eb";
+    Repo [label="Repo\n(config as code)"];
+  }
+  Repo -> Prometheus  [label="configs"];
+  Repo -> Grafana     [label="provisioning"];
+  Repo -> Loki        [label="configs", style=dashed];
+}
