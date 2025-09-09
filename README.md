@@ -14,7 +14,18 @@ Reusable Docker stack + backup/restore tooling.
 
 ## Quickstart (demo)
 ```bash
+<<<<<<< HEAD
 # use .env.example as a template
 docker compose -f compose/homepage/docker-compose.yml --env-file .env.example up -d
 docker compose -f compose/pihole-caddy/docker-compose.yml --env-file .env.example up -d
 ```
+=======
+cd ~/monitoring-stack
+cp .env.sample .env
+# edit .env: admin creds, TZ=America/Chicago, domain names (if using Traefik)
+
+docker compose pull
+docker compose up -d
+
+
+Built by Tim Heverin (dj-3dub). If this project is useful, ⭐ the repo and say hi on GitHub.
