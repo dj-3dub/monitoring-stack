@@ -1,0 +1,19 @@
+:80 {
+  redir https://{host}{uri} 308
+}
+
+status.pizza {
+  tls internal
+  encode gzip
+  reverse_proxy http://uptime-kuma:3001
+}
+
+metrics.pizza {
+  tls internal
+  reverse_proxy http://prometheus:9090
+}
+
+menu.pizza {
+  tls internal
+  reverse_proxy http://grafana:3000
+}
