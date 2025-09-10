@@ -40,8 +40,8 @@ This project provisions a full monitoring suite for containers and hosts. It emu
 
 ---
 
-## Elevator pitch (30 seconds)
-“Monitoring isn’t a tool, it’s a habit. I packaged a small, production-shaped observability stack that I can deploy in minutes, then use to troubleshoot anything I’m running—containers, services, endpoints. It proves I can design clean pipelines for metrics, logs, and synthetic checks, wire them into Grafana, and use them to drive decisions.”
+## Elevator pitch
+Monitoring isn’t a tool, it’s a habit. I packaged a small, production-shaped observability stack that I can deploy in minutes, then use to troubleshoot anything I’m running—containers, services, endpoints. It proves I can design clean pipelines for metrics, logs, and synthetic checks, wire them into Grafana, and use them to drive decisions.
 
 ---
 
