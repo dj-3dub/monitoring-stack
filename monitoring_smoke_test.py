@@ -36,7 +36,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default=DEFAULT_HOST)
     ap.add_argument("--prom-port", type=int, default=9090)
-    ap.add_argument("--grafana-port", type=int, default=3000)
+    ap.add_argument("--grafana-port", type=int, default=3300)
     ap.add_argument("--alert-port", type=int, default=9093)
     ap.add_argument("--cadvisor-port", type=int, default=8080)
     ap.add_argument("--blackbox-port", type=int, default=9115)
