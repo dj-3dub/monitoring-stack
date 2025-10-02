@@ -24,7 +24,8 @@ This project provisions a full monitoring suite for containers and hosts. It emu
 
 ## 📊 Architecture
 
-![Architecture](docs/architecture.png)
+![Architecture](docs/architecture.png)  
+➡️ [View scalable SVG version](docs/architecture.svg)
 
 ---
 
