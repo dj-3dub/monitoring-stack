@@ -1,0 +1,24 @@
+digraph MonitoringStack {
+	fontsize=10 rankdir=LR
+	Grafana [color=lightblue shape=box style=filled]
+	Prometheus [color=lightyellow shape=box style=filled]
+	NodeExporter [label="Node Exporter" color=lightgrey shape=box style=filled]
+	Blackbox [label="Blackbox Exporter" color=lightgrey shape=box style=filled]
+	Loki [color=lightpink shape=box style=filled]
+	Promtail [color=lightpink shape=box style=filled]
+	UptimeKuma [label="Uptime Kuma" color=lightgreen shape=box style=filled]
+	OTel [label="OTel Collector" color=orange shape=box style=filled]
+	Tempo [color=orange shape=box style=filled]
+	DemoAPI [label="Demo API (Flask + OTel)" color=gold shape=box style=filled]
+	NodeExporter -> Prometheus
+	Blackbox -> Prometheus
+	Prometheus -> Grafana [label=metrics]
+	Loki -> Grafana [label=logs]
+	Tempo -> Grafana [label=traces]
+	Promtail -> Loki [label=logs]
+	UptimeKuma -> Grafana [label=status]
+	DemoAPI -> OTel [label="OTLP traces/logs/metrics"]
+	OTel -> Tempo [label=traces]
+	OTel -> Loki [label=logs style=dashed]
+	OTel -> Prometheus [label=metrics style=dashed]
+}
