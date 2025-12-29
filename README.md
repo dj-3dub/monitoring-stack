@@ -60,10 +60,7 @@ Prometheus: http://localhost:9090
 
 VictoriaMetrics: http://localhost:8428
 
----
-
 🛠️ Tech Stack
-
 Containerization: Docker Compose
 
 Infrastructure as Code: Terraform
@@ -76,10 +73,8 @@ Dashboards & Alerts: Grafana
 
 Automation: Bash (Architecture-as-Code rendering)
 
----
-
 📂 Repo Structure
----
+Plaintext
 
 monitoring-stack/
 ├─ config/              # Centralized Source of Truth
@@ -92,9 +87,7 @@ monitoring-stack/
 ├─ tools/               # SRE utility toolkit
 ├─ compose.yaml         # Service Orchestration
 └─ Makefile             # Task automation
----
-
 📜 License
 MIT
 
-Built by Tim Heverin (dj-3dub) Cloud Engineer / SRE If this project is useful, ⭐ the repo and say hi on GitHub.
+Built by Tim Heverin (dj-3dub) Cloud Engineer / SRE If this project is useful, ⭐ the repo and say hi on GitHub. EOF
