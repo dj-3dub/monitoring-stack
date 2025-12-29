@@ -1,0 +1,16 @@
+groups:
+- name: node_recording_rules
+  interval: 1m
+  rules:
+  - record: job:node_cpu_seconds:rate5m
+    expr: sum by (instance, mode) (rate(node_cpu_seconds_total{mode!~"idle|iowait"}[5m]))
+  - record: instance:node_cpu_utilization:percent
+    expr: 100 * (1 - avg by (instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])))
+  - record: instance:node_memory_Active:bytes
+    expr: node_memory_Active_bytes
+  - record: instance:node_memory_Utilization:percent
+    expr: 100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))
+  - record: instance:node_filesystem_usage:percent
+    expr: 100 * (1 - (node_filesystem_free_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}))
+  - record: instance:node_disk_io_time_seconds:rate5m
+    expr: sum by (instance, device) (rate(node_disk_io_time_seconds_total[5m]))

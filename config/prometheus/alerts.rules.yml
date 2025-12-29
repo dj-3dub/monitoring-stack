@@ -1,0 +1,47 @@
+groups:
+- name: node_alerts
+  rules:
+  - alert: HostDown
+    expr: up{job=~"node-exporter|cadvisor|prometheus|blackbox_http"} == 0
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Target down: {{ $labels.instance }}"
+      description: "{{ $labels.job }} on {{ $labels.instance }} has been unreachable for 2+ minutes."
+
+  - alert: HighCPU
+    expr: instance:node_cpu_utilization:percent > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU on {{ $labels.instance }}"
+      description: "CPU utilization > 85% for 5 minutes."
+
+  - alert: HighMemory
+    expr: instance:node_memory_Utilization:percent > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory on {{ $labels.instance }}"
+      description: "Memory utilization > 85% for 5 minutes."
+
+  - alert: DiskFillingUp
+    expr: instance:node_filesystem_usage:percent > 85
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Disk usage > 85% on {{ $labels.instance }}"
+      description: "Filesystem is filling up. Investigate and clean up."
+
+  - alert: BlackboxProbeFailing
+    expr: probe_success == 0
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Blackbox probe failing for {{ $labels.instance }}"
+      description: "The probe to {{ $labels.instance }} using {{ $labels.module }} is failing."

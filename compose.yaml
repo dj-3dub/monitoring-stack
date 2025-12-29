@@ -1,0 +1,80 @@
+services:
+  # --- Metrics Database ---
+  victoria:
+    image: victoriametrics/victoria-metrics:latest
+    command:
+      - "--retentionPeriod=15d"
+      - "--selfScrapeInterval=0s"
+    restart: unless-stopped
+    ports: ["8428:8428"]
+    volumes: [ "vmdata:/storage" ]
+
+  # --- Monitoring Engine ---
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    volumes:
+      - ./config/prometheus:/etc/prometheus:ro
+      - prometheusdata:/prometheus
+    ports: ["9090:9090"]
+    depends_on:
+      - node-exporter
+      - cadvisor
+
+  # --- Alerting Logic ---
+  alertmanager:
+    image: prom/alertmanager:latest
+    restart: unless-stopped
+    volumes:
+      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports: ["9093:9093"]
+
+  # --- Visualization ---
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASS:-admin}
+    ports: ["3000:3000"]
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+
+  # --- Exporters (Data Sources) ---
+  node-exporter:
+    image: prom/node-exporter:latest
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports: ["8080:8080"]
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    restart: unless-stopped
+    volumes:
+      - ./config/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    ports: ["9115:9115"]
+
+volumes:
+  vmdata:
+  grafanadata:
+  prometheusdata:
