@@ -90,4 +90,4 @@ monitoring-stack/
 📜 License
 MIT
 
-Built by Tim Heverin (dj-3dub) Cloud Engineer / SRE If this project is useful, ⭐ the repo and say hi on GitHub. EOF
+Built by Tim Heverin (dj-3dub) Cloud Engineer / SRE If this project is useful, ⭐ the repo and say hi on GitHub.
