@@ -1,56 +1,44 @@
-// docs/architecture.dot
-// Render: dot -Tpng docs/architecture.dot -o docs/architecture.png
-//         dot -Tsvg docs/architecture.dot -o docs/architecture.svg
+digraph G {
+    rankdir=LR;
+    node [shape=box, style=filled, color="#E1E1E1", fontname="Arial"];
+    compound=true;
 
-digraph MonitoringStack {
-  rankdir=LR;
-  node [shape=box, style="rounded,filled", fillcolor="#f6f8fa", color="#d0d7de", fontname="Inter"];
-  edge [color="#8b949e"]; 
+    subgraph cluster_exporters {
+        label = "Data Sources (Exporters)";
+        style = dashed;
+        color = blue;
+        node [fillcolor="#D4E1F5"];
+        node_exp [label="Node Exporter\n(Host Metrics)"];
+        cadvisor [label="cAdvisor\n(Container Metrics)"];
+        blackbox [label="Blackbox Exporter\n(HTTP/TCP Probes)"];
+    }
 
-  subgraph cluster_edge {
-    label="Edge / Reverse Proxy"; labelloc=t; color="#d0d7de"; style="rounded";
-    Traefik [label="Traefik\n(optional)"];
-  }
+    subgraph cluster_core {
+        label = "Monitoring Core";
+        style = dashed;
+        color = red;
+        node [fillcolor="#F5D4D4"];
+        prom [label="Prometheus\n(Scraping & Alerting)"];
+        vic [label="VictoriaMetrics\n(TSDB Storage)"];
+    }
 
-  subgraph cluster_apps {
-    label="Apps & Views"; color="#d0d7de"; style="rounded";
-    Grafana [label="Grafana\nDashboards/Alerts"];
-    Kuma [label="Uptime-Kuma\nStatus/Synthetics"];
-  }
+    subgraph cluster_output {
+        label = "Visualization & Alerting";
+        style = dashed;
+        color = green;
+        node [fillcolor="#D4F5D4"];
+        grafana [label="Grafana\n(Dashboards-as-Code)"];
+        alertmgr [label="Alertmanager\n(Notification Routing)"];
+    }
 
-  subgraph cluster_observability {
-    label="Observability Core"; color="#d0d7de"; style="rounded";
-    Prom [label="Prometheus\nscrape + alert"];
-    Blackbox [label="Blackbox Exporter"];
-    Loki [label="Loki\nlog store"];
-    Promtail [label="Promtail\nlog shipper"];
-    NodeExp [label="Node Exporter\nhost metrics"];
-    Cadvisor [label="cAdvisor\ncontainer metrics" style=dashed];
-  }
-
-  subgraph cluster_storage {
-    label="Volumes"; color="#d0d7de"; style="rounded";
-    vol_grafana [label="/data/grafana" shape=folder];
-    vol_prom [label="/data/prometheus" shape=folder];
-    vol_loki [label="/data/loki" shape=folder];
-    vol_kuma [label="/data/uptime-kuma" shape=folder];
-  }
-
-  User[shape=ellipse, label="User / Admin"];
-  User -> Traefik;
-  Traefik -> Grafana;
-  Traefik -> Kuma;
-
-  Prom -> Grafana [label="datasource"];
-  NodeExp -> Prom [label="scrape"];
-  Cadvisor -> Prom [label="scrape" style=dashed];
-  Blackbox -> Prom [label="probe results"];
-
-  Promtail -> Loki [label="push logs"];
-  Loki -> Grafana [label="logs datasource"];
-
-  Grafana -> vol_grafana [style=dashed];
-  Prom -> vol_prom [style=dashed];
-  Loki -> vol_loki [style=dashed];
-  Kuma -> vol_kuma [style=dashed];
+    # Data Flow
+    node_exp -> prom [label="scrape"];
+    cadvisor -> prom [label="scrape"];
+    blackbox -> prom [label="scrape"];
+    
+    prom -> vic [label="remote_write"];
+    prom -> alertmgr [label="alerts"];
+    
+    vic -> grafana [label="query"];
+    prom -> grafana [label="query"];
 }

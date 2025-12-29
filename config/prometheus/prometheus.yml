@@ -1,37 +1,77 @@
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-rule_files:
-  - /etc/prometheus/rules/alerts.yml
+  scrape_interval: 15s     # Indented 2 spaces
+  evaluation_interval: 15s # Indented 2 spaces
+
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: ["alertmanager:9093"]
+        - targets:
+          - "alertmanager:9093"
+
+# Load alerting/recording rules if you’re using them (files are mounted via compose.override.yaml)
+rule_files:
+  - /etc/prometheus/alerts.rules.yml
+  - /etc/prometheus/recording.rules.yml
+
 scrape_configs:
-  - job_name: prometheus
-    static_configs: [{targets: ["prometheus:9090"]}]
-  - job_name: node_exporter
-    static_configs: [{targets: ["localhost:9100"]}]
-  - job_name: cadvisor
-    static_configs: [{targets: ["cadvisor:8080"]}]
-  - job_name: blackbox_http
+  # Prometheus self-scrape
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  # Node Exporter (host metrics)
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["host.docker.internal:9100"]
+
+  # cAdvisor (container metrics)
+  - job_name: "cadvisor"
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  # ------------------------------
+  # Blackbox Exporter (HTTP/S)
+  # ------------------------------
+  # Probes HTTP(S) endpoints via blackbox-exporter. Targets are *the actual URLs* you want to check.
+  - job_name: "blackbox_http"
     metrics_path: /probe
-    params: { module: [http_2xx] }
+    params:
+      module: [http_2xx]         # must match a module in blackbox/blackbox.yml
     static_configs:
       - targets:
-          - http://localhost:3000
-          - http://localhost:9090
-          - http://localhost:8080
+          # Internal services (good for portfolio demos)
+          - http://grafana:3000
+          - http://prometheus:9090
+          # Add your own external sites or homelab services here:
+          # - https://example.com
+          # - http://192.168.2.1
+    # Magic relabels to pass the original target to blackbox and label the series nicely
     relabel_configs:
-      - { source_labels: [__address__], target_label: __param_target }
-      - { source_labels: [__param_target], target_label: instance }
-      - { target_label: __address__, replacement: blackbox:9115 }
-  - job_name: blackbox_icmp
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # ------------------------------
+  # Blackbox Exporter (ICMP / ping)
+  # ------------------------------
+  - job_name: "blackbox_icmp"
     metrics_path: /probe
-    params: { module: [icmp] }
+    params:
+      module: [icmp]             # must match a module in blackbox/blackbox.yml
     static_configs:
-      - targets: ["1.1.1.1", "8.8.8.8"]
+      - targets:
+          # Public resolvers (example)
+          - 1.1.1.1
+          - 8.8.8.8
+          # LAN devices, gateways, etc. (add yours):
+          # - 192.168.2.1
     relabel_configs:
-      - { source_labels: [__address__], target_label: __param_target }
-      - { source_labels: [__param_target], target_label: instance }
-      - { target_label: __address__, replacement: blackbox:9115 }
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
