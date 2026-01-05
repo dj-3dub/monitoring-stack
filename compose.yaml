@@ -7,7 +7,8 @@ services:
       - "--selfScrapeInterval=0s"
     restart: unless-stopped
     ports: ["8428:8428"]
-    volumes: [ "vmdata:/storage" ]
+    volumes:
+      - vmdata:/storage
 
   # --- Monitoring Engine ---
   prometheus:
@@ -19,7 +20,7 @@ services:
     volumes:
       - ./config/prometheus:/etc/prometheus:ro
       - prometheusdata:/prometheus
-    ports: ["9090:9090"]
+    ports: ["9091:9090"]
     depends_on:
       - node-exporter
       - cadvisor
@@ -47,7 +48,10 @@ services:
   # --- Exporters (Data Sources) ---
   node-exporter:
     image: prom/node-exporter:latest
+    container_name: node-exporter
     restart: unless-stopped
+    ports:
+      - "9100:9100"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -58,21 +62,34 @@ services:
       - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: cadvisor
     restart: unless-stopped
+    privileged: true
+    command:
+      - '--docker_only=true'
+      - '--housekeeping_interval=10s'
+      # This is the fix for RHEL 9: tell it to look inside the system.slice
+      - '--raw_cgroup_prefix_whitelist=/system.slice'
     volumes:
       - /:/rootfs:ro
-      - /var/run:/var/run:rw
+      - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
-    ports: ["8080:8080"]
-
+      - /dev/disk/:/dev/disk:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro,z  # ,z is for SELinux
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    ports:
+      - "8080:8080"
+  
   blackbox-exporter:
     image: prom/blackbox-exporter:latest
+    container_name: blackbox-exporter
     restart: unless-stopped
     volumes:
       - ./config/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
-    ports: ["9115:9115"]
+    ports:
+      - "9115:9115"
 
 volumes:
   vmdata:
