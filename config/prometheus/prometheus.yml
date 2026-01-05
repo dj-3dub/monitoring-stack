@@ -22,7 +22,8 @@ scrape_configs:
   # Node Exporter (host metrics)
   - job_name: "node-exporter"
     static_configs:
-      - targets: ["host.docker.internal:9100"]
+      # FIXED: Changed from host.docker.internal to the internal service name
+      - targets: ["node-exporter:9100"]
 
   # cAdvisor (container metrics)
   - job_name: "cadvisor"

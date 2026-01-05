@@ -1,42 +1,25 @@
-<<<<<<< HEAD
-# --- Generic OS/editor junk ---
+# OS/Editor junk
 .DS_Store
 Thumbs.db
 *.swp
-*~
-.idea/
 .vscode/
+.idea/
 
-# --- Git ---
-.git-credentials
-.gitconfig.local
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
 
-# --- Env / secrets (if used locally) ---
+# Environment/Secrets
 .env
 .env.*
 
-# --- Rust (agent) ---
-# ignore all cargo build outputs anywhere
-**/target/
-# rust/cargo extras
-**/*.rs.bk
-
-# --- Node (if any frontends get added later) ---
-node_modules/
-
-# --- Docker / tooling ---
+# Docker & Monitoring Data
 docker-compose.override.yml
-*.local.yml
-
-# --- Grafana (local state if ever bind-mounted) ---
 grafana/data/
-grafana/grafana.db
-
-# --- Prometheus (local state if ever bind-mounted) ---
 prometheus/data/
+**/target/
 
-# --- Temp/outputs ---
-tmp/
+# Logs
 *.log
-=======
-/target

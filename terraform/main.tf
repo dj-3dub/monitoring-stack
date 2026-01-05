@@ -19,12 +19,14 @@ variable "project_name" {
 
 resource "null_resource" "monitoring_stack" {
   triggers = {
-    compose_hash = filemd5("${abspath(var.project_root)}/docker-compose.yml")
+    # Fixed filename to compose.yaml and used path.module for reliability
+    compose_hash = filemd5("${path.module}/../compose.yaml")
     project_name = var.project_name
   }
 
   provisioner "local-exec" {
-    command = "docker compose -p ${self.triggers.project_name} -f ${abspath(var.project_root)}/docker-compose.yml up -d --remove-orphans"
+    # Using path.module to ensure we target the root compose file correctly
+    command = "docker compose -p ${self.triggers.project_name} -f ${path.module}/../compose.yaml up -d --remove-orphans"
     environment = {
       GRAFANA_ADMIN_USER     = "admin"
       GRAFANA_ADMIN_PASSWORD = "admin"
@@ -33,7 +35,8 @@ resource "null_resource" "monitoring_stack" {
 
   provisioner "local-exec" {
     when    = destroy
-    command = "docker compose -p ${self.triggers.project_name} -f ${abspath(path.module)}/../docker-compose.yml down -v"
+    # Fixed filename to compose.yaml for the destroy provisioner
+    command = "docker compose -p ${self.triggers.project_name} -f ${path.module}/../compose.yaml down -v"
   }
 }
 
@@ -45,15 +48,14 @@ resource "null_resource" "post_deploy_check" {
   }
 
   provisioner "local-exec" {
-    # This loop checks port 3000 every 2 seconds for up to 60 seconds.
-    # It proceeds immediately once the port is open.
+    # Corrected path to the smoke test script in the project root
     command = <<EOT
       echo "Waiting for Grafana (port 3000) to open..."
       for i in {1..30}; do
         if nc -z localhost 3000; then
           echo "Grafana is up! Running smoke tests..."
           sleep 5
-          python3 ${abspath(var.project_root)}/monitoring_smoke_test.py
+          python3 ${path.module}/../monitoring_smoke_test.py
           exit 0
         fi
         echo "Still waiting... ($i/30)"
