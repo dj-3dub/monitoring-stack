@@ -24,6 +24,8 @@ Key capabilities include:
 
 ## Architecture
 
+![Monitoring Stack Architecture](docs/architecture.png)
+
 The platform consists of the following core components:
 
 -   Prometheus
