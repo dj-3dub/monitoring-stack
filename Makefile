@@ -7,7 +7,7 @@ SHELL := /bin/bash
 
 # ---- Paths & Config ----
 STACK_DIR   ?= $(CURDIR)
-TERRAFORM_DIR := $(STACK_DIR)/terraform
+TERRAFORM_DIR := $(STACK_DIR)/terraform/aws
 COMPOSE_FILES := -f $(STACK_DIR)/docker-compose.yml
 
 # Env vars for Docker and Grafana API
