@@ -1,0 +1,117 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install monitoring server packages
+  ansible.builtin.apt:
+    name: "{{ monitoring_packages }}"
+    state: present
+
+- name: Enable required services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - chrony
+    - ssh
+    - open-vm-tools
+    - fail2ban
+    - docker
+
+- name: Create monitoring directory
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}"
+    state: directory
+    owner: "{{ monitoring_user }}"
+    group: "{{ monitoring_group }}"
+    mode: "0755"
+
+- name: Synchronize repository to monitoring directory
+  ansible.posix.synchronize:
+    src: "{{ playbook_dir }}/../"
+    dest: "{{ monitoring_dir }}/"
+    delete: false
+    recursive: true
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=.env"
+      - "--exclude=.terraform"
+      - "--exclude=*.tfstate"
+      - "--exclude=*.tfstate.*"
+      - "--exclude=*.tfvars"
+      - "--exclude=backups"
+      - "--exclude=config/grafana/data"
+      - "--exclude=config/prometheus/data"
+      - "--exclude=config/alertmanager/data"
+      - "--exclude=config/n8n/data"
+      - "--exclude=config/tempo/data"
+
+- name: Ensure monitoring directory ownership
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}"
+    state: directory
+    owner: "{{ monitoring_user }}"
+    group: "{{ monitoring_group }}"
+    mode: "0755"
+
+- name: Repair runtime data ownership recursively
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+    recurse: true
+  loop:
+    - { path: "config/grafana/data", owner: "472", group: "472", mode: "0755" }
+    - { path: "config/prometheus/data", owner: "65534", group: "65534", mode: "0755" }
+    - { path: "config/alertmanager/data", owner: "65534", group: "65534", mode: "0755" }
+    - { path: "config/n8n/data", owner: "1000", group: "1000", mode: "0755" }
+    - { path: "config/tempo/data", owner: "10001", group: "10001", mode: "0777" }
+
+- name: Create runtime data directories
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "config/grafana/data", owner: "472", group: "472", mode: "0755" }
+    - { path: "config/prometheus/data", owner: "65534", group: "65534", mode: "0755" }
+    - { path: "config/alertmanager/data", owner: "65534", group: "65534", mode: "0755" }
+    - { path: "config/n8n/data", owner: "1000", group: "1000", mode: "0755" }
+    - { path: "config/tempo/data", owner: "10001", group: "10001", mode: "0777" }
+
+- name: Deploy environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ monitoring_dir }}/.env"
+    owner: "{{ monitoring_user }}"
+    group: "{{ monitoring_group }}"
+    mode: "0600"
+
+- name: Allow monitoring ports through UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ monitoring_ports }}"
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+
+- name: Validate Docker Compose configuration
+  ansible.builtin.command:
+    cmd: docker compose --profile automation --profile telemetry config
+    chdir: "{{ monitoring_dir }}"
+  changed_when: false
+
+- name: Start monitoring platform
+  ansible.builtin.command:
+    cmd: docker compose --profile automation --profile telemetry up -d
+    chdir: "{{ monitoring_dir }}"
+  changed_when: true

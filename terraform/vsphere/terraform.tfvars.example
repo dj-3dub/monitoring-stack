@@ -1,0 +1,15 @@
+vsphere_server       = "192.168.2.X"
+vsphere_user         = "administrator@vsphere.local"
+vsphere_password     = "CHANGE_ME"
+allow_unverified_ssl = true
+
+datacenter    = "Datacenter"
+datastore     = "datastore1"
+resource_pool = "Resources"
+network       = "VM Network"
+template_name = "debian-13-template"
+
+vm_name      = "monitoring01"
+vm_cpu       = 2
+vm_memory    = 4096
+vm_disk_size = 80

@@ -1,0 +1,42 @@
+---
+monitoring_user: tim
+monitoring_group: tim
+monitoring_dir: /opt/monitoring
+
+grafana_admin_user: admin
+grafana_admin_password: ChangeMe!
+
+monitoring_ip: 192.168.2.29
+timezone: America/Chicago
+
+monitoring_packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - git
+  - make
+  - vim
+  - htop
+  - btop
+  - tmux
+  - tree
+  - jq
+  - mtr
+  - ncdu
+  - iotop
+  - chrony
+  - ufw
+  - fail2ban
+  - open-vm-tools
+  - rsync
+
+monitoring_ports:
+  - "22"
+  - "3000"
+  - "9090"
+  - "9093"
+  - "9115"
+  - "5678"
+  - "3200"
+  - "4317"
+  - "4318"

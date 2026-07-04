@@ -1,28 +1,20 @@
-# OS/Editor junk
-.DS_Store
-Thumbs.db
-*.swp
-.vscode/
-.idea/
+# Runtime data
+config/grafana/data/
+config/prometheus/data/
+config/alertmanager/data/
+config/n8n/data/
+config/tempo/data/
+backups/
 
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.backup
-*.tfstate.*
-*.tfvars
-localstack_providers_override.tf
-
-# Environment/Secrets
+# Secrets
 .env
-.env.*
+*.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
 
-# Docker & Monitoring Data
-docker-compose.override.yml
-grafana/data/
-prometheus/data/
-**/target/
-
-# Logs
-*.log
-
+# OS/editor
+.DS_Store
+*.swp
+*.tmp
