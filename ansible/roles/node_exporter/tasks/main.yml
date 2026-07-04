@@ -1,0 +1,25 @@
+---
+- name: Install Node Exporter
+  ansible.builtin.apt:
+    update_cache: true
+    name: "{{ node_exporter_package }}"
+    state: present
+
+- name: Enable and start Node Exporter
+  ansible.builtin.systemd:
+    name: "{{ node_exporter_service }}"
+    enabled: true
+    state: started
+
+- name: Check if UFW exists
+  ansible.builtin.command: which ufw
+  register: ufw_check
+  changed_when: false
+  failed_when: false
+
+- name: Allow Node Exporter through UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ node_exporter_port }}"
+    proto: tcp
+  when: ufw_check.rc == 0

@@ -1,170 +1,178 @@
-# ===== Monitoring Stack Makefile (Fixed Shell Path) =====
-.RECIPEPREFIX := >
-# Using a more universal path for bash
+# Cloud-Native Observability Platform Makefile
+# Use tabs, not spaces, for command indentation.
+
 SHELL := /bin/bash
-.ONESHELL:
-.SHELLFLAGS := -eu -o pipefail -c
+COMPOSE := docker compose
+BACKUP_DIR := backups
+DATE := $(shell date +%Y%m%d-%H%M%S)
 
-# ---- Paths & Config ----
-STACK_DIR   ?= $(CURDIR)
-TERRAFORM_DIR := $(STACK_DIR)/terraform/aws
-COMPOSE_FILES := -f $(STACK_DIR)/docker-compose.yml
+ANSIBLE_INVENTORY := ansible/inventory.ini
+TERRAFORM_DIR := terraform/vsphere
 
-# Env vars for Docker and Grafana API
-export GRAFANA_ADMIN_USER ?= admin
-export GRAFANA_ADMIN_PASSWORD ?= admin
+.PHONY: help \
+	up down restart logs status ps config validate pull update \
+	automation-up automation-down \
+	telemetry-up telemetry-down \
+	ansible-monitoring ansible-node-exporter ansible-ping ansible-check \
+	terraform-init terraform-plan terraform-apply terraform-destroy \
+	platform-up \
+	backup clean prune shell-grafana shell-prometheus \
+	platform-up guard-source \
 
-DC := docker compose $(COMPOSE_FILES)
+help:
+	@echo ""
+	@echo "Cloud-Native Observability Platform Commands"
+	@echo ""
+	@echo "Platform"
+	@echo "--------"
+	@echo "  make platform-up             Deploy full platform through Ansible"
+	@echo ""
+	@echo "Docker Runtime"
+	@echo "--------------"
+	@echo "  make up                      Start core monitoring stack"
+	@echo "  make down                    Stop core monitoring stack"
+	@echo "  make restart                 Restart stack"
+	@echo "  make logs                    Follow logs"
+	@echo "  make status                  Show container status and stats"
+	@echo "  make ps                      Show compose services"
+	@echo "  make config                  Render compose config"
+	@echo "  make validate                Validate compose config"
+	@echo "  make pull                    Pull latest images"
+	@echo "  make update                  Pull and restart stack"
+	@echo ""
+	@echo "Automation"
+	@echo "----------"
+	@echo "  make automation-up           Start n8n automation profile"
+	@echo "  make automation-down         Stop n8n"
+	@echo ""
+	@echo "Telemetry"
+	@echo "---------"
+	@echo "  make telemetry-up            Start OTel Collector and Tempo"
+	@echo "  make telemetry-down          Stop OTel Collector and Tempo"
+	@echo ""
+	@echo "Ansible"
+	@echo "-------"
+	@echo "  make ansible-ping            Test Ansible connectivity"
+	@echo "  make ansible-check           Dry-run monitoring playbook"
+	@echo "  make ansible-monitoring      Configure monitoring server"
+	@echo "  make ansible-node-exporter   Configure monitored hosts"
+	@echo ""
+	@echo "Terraform"
+	@echo "---------"
+	@echo "  make terraform-init          Initialize Terraform"
+	@echo "  make terraform-plan          Show Terraform plan"
+	@echo "  make terraform-apply         Apply Terraform changes"
+	@echo "  make terraform-destroy       Destroy Terraform resources"
+	@echo ""
+	@echo "Maintenance"
+	@echo "-----------"
+	@echo "  make backup                  Backup configs"
+	@echo "  make clean                   Remove stopped containers"
+	@echo "  make prune                   Docker system prune"
+	@echo ""
 
-# ---- Grafana API config ----
-GRAFANA_URL ?= http://localhost:3000
-GRAFANA_FOLDER ?= Monitoring Stack
-
-# Dashboard IDs
-DASH_NODE_EXPORTER ?= 1860
-DASH_DOCKER        ?= 193
-DASH_BLACKBOX      ?= 7587
-
-# =========================
-# Terraform Lifecycle
-# =========================
-.PHONY: tf-init tf-up tf-down tf-status smoke-test
-
-tf-init:
-> terraform -chdir=$(TERRAFORM_DIR) init
-
-tf-up:
-> @echo "Deploying stack via Terraform..."
-> terraform -chdir=$(TERRAFORM_DIR) apply -auto-approve
-> @$(MAKE) smoke-test
-
-tf-down:
-> @echo "Destroying stack via Terraform..."
-> terraform -chdir=$(TERRAFORM_DIR) destroy -auto-approve
-
-tf-status:
-> terraform -chdir=$(TERRAFORM_DIR) show
-
-smoke-test:
-> @echo "Running monitoring smoke tests..."
-> python3 $(STACK_DIR)/monitoring_smoke_test.py --retries 15 --sleep 3
-
-# =========================
-# Basic Docker targets
-# =========================
-.PHONY: up ps logs restart down status
 up:
-> $(DC) up -d
-
-ps:
-> $(DC) ps
-
-logs:
-> $(DC) logs -f
-
-restart:
-> $(DC) restart
+	$(COMPOSE) up -d
 
 down:
-> $(DC) down
+	$(COMPOSE) down
 
-status: ps targets
+restart:
+	$(COMPOSE) restart
 
-# =========================
-# Prometheus helpers
-# =========================
-.PHONY: reload-prom targets rules
-reload-prom:
-> echo "Reloading Prometheus config..."
-> $(DC) exec -T prometheus wget -qO- --post-data '' 'http://localhost:9090/-/reload' >/dev/null || true
-> echo "Prometheus reloaded."
+logs:
+	$(COMPOSE) logs -f --tail=100
 
-targets:
-> echo "Active Prometheus targets:"
-> $(DC) exec -T prometheus wget -qO- 'http://localhost:9090/api/v1/targets' | jq -r '.data.activeTargets[] | " - \(.labels.job) / \(.labels.instance): \(.health)"'
+status:
+	$(COMPOSE) ps
+	@echo ""
+	@docker stats --no-stream
 
-rules:
-> echo "Loaded Prometheus rule groups:"
-> $(DC) exec -T prometheus wget -qO- 'http://localhost:9090/api/v1/rules' | jq -r '.data.groups[]?.name' | sed 's/^/ - /' || true
+ps:
+	$(COMPOSE) ps
 
-# =========================
-# Blackbox Exporter wiring
-# =========================
-.PHONY: blackbox-setup
-blackbox-setup:
-> mkdir -p "$(STACK_DIR)/config/blackbox"
-> if [ ! -f "$(STACK_DIR)/config/blackbox/blackbox.yml" ]; then
-> echo "modules:" > "$(STACK_DIR)/config/blackbox/blackbox.yml"
-> echo "  http_2xx:" >> "$(STACK_DIR)/config/blackbox/blackbox.yml"
-> echo "    prober: http" >> "$(STACK_DIR)/config/blackbox/blackbox.yml"
-> echo "    timeout: 5s" >> "$(STACK_DIR)/config/blackbox/blackbox.yml"
-> echo "    http:" >> "$(STACK_DIR)/config/blackbox/blackbox.yml"
-> echo "      method: GET" >> "$(STACK_DIR)/config/blackbox/blackbox.yml"
-> echo "      preferred_ip_protocol: \"ip4\"" >> "$(STACK_DIR)/config/blackbox/blackbox.yml"
-> echo "  icmp:" >> "$(STACK_DIR)/config/blackbox/blackbox.yml"
-> echo "    prober: icmp" >> "$(STACK_DIR)/config/blackbox/blackbox.yml"
-> echo "    timeout: 5s" >> "$(STACK_DIR)/config/blackbox/blackbox.yml"
-> echo "Wrote blackbox.yml"
-> fi
-> $(DC) up -d blackbox
-> $(MAKE) reload-prom
+config:
+	$(COMPOSE) config
 
-# =========================
-# Grafana helpers
-# =========================
-.PHONY: grafana-health grafana-clean-victoria grafana-import-node grafana-import-docker grafana-import-blackbox grafana-move-core dashboards-tidy grafana-folder-id
+validate:
+	$(COMPOSE) --profile automation --profile telemetry config >/dev/null
+	@echo "compose.yaml is valid."
 
-grafana-health:
-> curl -sS -u "$(GRAFANA_ADMIN_USER):$(GRAFANA_ADMIN_PASSWORD)" "$(GRAFANA_URL)/api/health" | jq .
+pull:
+	$(COMPOSE) --profile automation --profile telemetry pull
 
-grafana-folder-id:
-> tmpdir="$$(mktemp -d)"; trap 'rm -rf "$$tmpdir"' EXIT
-> curl -sS -u "$(GRAFANA_ADMIN_USER):$(GRAFANA_ADMIN_PASSWORD)" "$(GRAFANA_URL)/api/folders" >"$$tmpdir/folders.json"
-> fid="$$(jq -r --arg name '$(GRAFANA_FOLDER)' '.[] | select(.title==$$name) | .id' "$$tmpdir/folders.json" | head -n1)"
-> if [[ -z "$$fid" || "$$fid" == "null" ]]; then
-> echo '{"title":"$(GRAFANA_FOLDER)"}' >"$$tmpdir/create.json"
-> curl -sS -u "$(GRAFANA_ADMIN_USER):$(GRAFANA_ADMIN_PASSWORD)" -H "Content-Type: application/json" -X POST --data-binary "@$$tmpdir/create.json" "$(GRAFANA_URL)/api/folders" >"$$tmpdir/resp.json"
-> fid="$$(jq -r '.id' "$$tmpdir/resp.json")"
-> echo "Created folder id=$$fid"
-> else
-> echo "Folder exists id=$$fid"
-> fi
-> echo "$$fid"
+update: pull
+	$(COMPOSE) --profile automation --profile telemetry up -d
+	@echo "Monitoring platform updated."
 
-grafana-clean-victoria:
-> echo "Removing old VictoriaMetrics dashboards..."
-> curl -sS -u "$(GRAFANA_ADMIN_USER):$(GRAFANA_ADMIN_PASSWORD)" "$(GRAFANA_URL)/api/search?type=dash-db&query=" | jq -r '.[] | select(.title=="Level0 VictoriaMetrics Overview") | .uid' | while read -r u; do [ -z "$$u" ] && continue; curl -sS -u "$(GRAFANA_ADMIN_USER):$(GRAFANA_ADMIN_PASSWORD)" -X DELETE "$(GRAFANA_URL)/api/dashboards/uid/$$u" >/dev/null || true; done
-> echo "Done."
+automation-up:
+	$(COMPOSE) --profile automation up -d n8n
 
-grafana-import-node:
-> tmp="$$(mktemp -d)"; trap 'rm -rf "$$tmp"' EXIT
-> curl -fsSL "https://grafana.com/api/dashboards/$(DASH_NODE_EXPORTER)/revisions/latest/download" > "$$tmp/model.json"
-> jq '{dashboard: ., overwrite: true, folderId: 0}' "$$tmp/model.json" > "$$tmp/payload.json"
-> curl -sS -u "$(GRAFANA_ADMIN_USER):$(GRAFANA_ADMIN_PASSWORD)" -H "Content-Type: application/json" -X POST --data-binary "@$$tmp/payload.json" "$(GRAFANA_URL)/api/dashboards/db" >/dev/null
-> echo "Imported Node Exporter Full"
+automation-down:
+	$(COMPOSE) stop n8n
 
-grafana-import-docker:
-> tmp="$$(mktemp -d)"; trap 'rm -rf "$$tmp"' EXIT
-> curl -fsSL "https://grafana.com/api/dashboards/$(DASH_DOCKER)/revisions/latest/download" > "$$tmp/model.json"
-> jq '{dashboard: ., overwrite: true, folderId: 0}' "$$tmp/model.json" > "$$tmp/payload.json"
-> curl -sS -u "$(GRAFANA_ADMIN_USER):$(GRAFANA_ADMIN_PASSWORD)" -H "Content-Type: application/json" -X POST --data-binary "@$$tmp/payload.json" "$(GRAFANA_URL)/api/dashboards/db" >/dev/null
-> echo "Imported Docker / cAdvisor"
+telemetry-up:
+	$(COMPOSE) --profile telemetry up -d otel-collector tempo
 
-grafana-import-blackbox:
-> tmp="$$(mktemp -d)"; trap 'rm -rf "$$tmp"' EXIT
-> curl -fsSL "https://grafana.com/api/dashboards/$(DASH_BLACKBOX)/revisions/latest/download" > "$$tmp/model.json"
-> jq '{dashboard: ., overwrite: true, folderId: 0}' "$$tmp/model.json" > "$$tmp/payload.json"
-> curl -sS -u "$(GRAFANA_ADMIN_USER):$(GRAFANA_ADMIN_PASSWORD)" -H "Content-Type: application/json" -X POST --data-binary "@$$tmp/payload.json" "$(GRAFANA_URL)/api/dashboards/db" >/dev/null
-> echo "Imported Blackbox Exporter"
+telemetry-down:
+	$(COMPOSE) stop otel-collector tempo
 
-grafana-move-core:
-> fid="$$( $(MAKE) -s grafana-folder-id | tail -n1 )"
-> echo "Moving dashboards into folder ID $$fid..."
-> move() { title="$$1"; q="$$(jq -rn --arg x "$$title" '$$x|@uri')"; tmp="$$(mktemp -d)"; trap 'rm -rf "$$tmp"' RETURN; curl -sS -u "$(GRAFANA_ADMIN_USER):$(GRAFANA_ADMIN_PASSWORD)" "$(GRAFANA_URL)/api/search?type=dash-db&query=$$q" >"$$tmp/s.json"; duid="$$(jq -r --arg t "$$title" '.[] | select(.title==$$t) | .uid' "$$tmp/s.json" | head -n1)"; if [[ -z "$$duid" || "$$duid" == "null" ]]; then echo "Not found: $$title"; return 0; fi; curl -sS -u "$(GRAFANA_ADMIN_USER):$(GRAFANA_ADMIN_PASSWORD)" "$(GRAFANA_URL)/api/dashboards/uid/$$duid" >"$$tmp/dash.json"; jq '.dashboard' "$$tmp/dash.json" >"$$tmp/model.json"; jq -n --slurpfile m "$$tmp/model.json" --argjson folderId "$$fid" '{dashboard: $$m[0], overwrite: true, folderId: $$folderId}' >"$$tmp/payload.json"; curl -sS -u "$(GRAFANA_ADMIN_USER):$(GRAFANA_ADMIN_PASSWORD)" -H "Content-Type: application/json" -X POST --data-binary "@$$tmp/payload.json" "$(GRAFANA_URL)/api/dashboards/db" >/dev/null; echo "✓ Moved $$title"; }
-> move "Docker monitoring"
-> move "Node Exporter Full"
-> move "Containers Overview"
-> move "Node / Host Overview"
+ansible-ping:
+	ansible -i $(ANSIBLE_INVENTORY) all -m ping
 
-dashboards-tidy: grafana-clean-victoria grafana-import-node grafana-import-docker grafana-import-blackbox grafana-move-core
-> echo "Dashboards tidied."
+ansible-check:
+	ansible-playbook -i $(ANSIBLE_INVENTORY) ansible/monitoring.yml --check
+
+ansible-monitoring:
+	ansible-playbook -i $(ANSIBLE_INVENTORY) ansible/monitoring.yml
+
+ansible-node-exporter:
+	ansible-playbook -i $(ANSIBLE_INVENTORY) ansible/node-exporter.yml
+
+terraform-init:
+	cd $(TERRAFORM_DIR) && terraform init
+
+terraform-plan:
+	cd $(TERRAFORM_DIR) && terraform plan
+
+terraform-apply:
+	cd $(TERRAFORM_DIR) && terraform apply
+
+terraform-destroy:
+	cd $(TERRAFORM_DIR) && terraform destroy
+
+guard-source:
+	@if [ "$$(pwd)" = "/opt/monitoring" ]; then \
+		echo "ERROR: Do not run Make from /opt/monitoring."; \
+		echo "Run from ~/monitoring-stack instead."; \
+		exit 1; \
+	fi
+
+platform-up: guard-source ansible-monitoring
+	@echo "Platform deployed through Ansible."
+
+backup:
+	@mkdir -p $(BACKUP_DIR)
+	@tar -czf $(BACKUP_DIR)/monitoring-config-$(DATE).tar.gz \
+		compose.yaml \
+		Makefile \
+		.env \
+		config \
+		ansible \
+		terraform \
+		scripts \
+		tools \
+		docs
+	@echo "Backup created: $(BACKUP_DIR)/monitoring-config-$(DATE).tar.gz"
+
+clean:
+	docker container prune -f
+
+prune:
+	docker system prune -f
+
+shell-grafana:
+	$(COMPOSE) exec grafana /bin/sh
+
+shell-prometheus:
+	$(COMPOSE) exec prometheus /bin/sh

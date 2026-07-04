@@ -1,0 +1,7 @@
+---
+- name: Configure monitoring platform
+  hosts: monitoring
+  become: true
+
+  roles:
+    - monitoring

@@ -1,44 +1,77 @@
 digraph G {
-    rankdir=LR;
-    node [shape=box, style=filled, color="#E1E1E1", fontname="Arial"];
-    compound=true;
 
-    subgraph cluster_exporters {
-        label = "Data Sources (Exporters)";
-        style = dashed;
-        color = blue;
-        node [fillcolor="#D4E1F5"];
-        node_exp [label="Node Exporter\n(Host Metrics)"];
-        cadvisor [label="cAdvisor\n(Container Metrics)"];
-        blackbox [label="Blackbox Exporter\n(HTTP/TCP Probes)"];
-    }
+rankdir=TB;
+splines=ortho;
+nodesep=0.6;
+ranksep=1.0;
 
-    subgraph cluster_core {
-        label = "Monitoring Core";
-        style = dashed;
-        color = red;
-        node [fillcolor="#F5D4D4"];
-        prom [label="Prometheus\n(Scraping & Alerting)"];
-        vic [label="VictoriaMetrics\n(TSDB Storage)"];
-    }
+graph [
+    bgcolor="white"
+];
 
-    subgraph cluster_output {
-        label = "Visualization & Alerting";
-        style = dashed;
-        color = green;
-        node [fillcolor="#D4F5D4"];
-        grafana [label="Grafana\n(Dashboards-as-Code)"];
-        alertmgr [label="Alertmanager\n(Notification Routing)"];
-    }
+node [
+    shape=box
+    style="rounded,filled"
+    fontname="Arial"
+    fontsize=10
+];
 
-    # Data Flow
-    node_exp -> prom [label="scrape"];
-    cadvisor -> prom [label="scrape"];
-    blackbox -> prom [label="scrape"];
-    
-    prom -> vic [label="remote_write"];
-    prom -> alertmgr [label="alerts"];
-    
-    vic -> grafana [label="query"];
-    prom -> grafana [label="query"];
+edge [
+    fontname="Arial"
+];
+
+subgraph cluster_repo {
+    label="GitHub Repository";
+    color=lightgrey;
+
+    repo [label="monitoring-stack\nRepository", fillcolor=lightblue];
+    tf [label="Terraform\n(vSphere / AWS)", fillcolor=lightyellow];
+    ansible [label="Ansible\nProvisioning", fillcolor=lightyellow];
+    compose [label="Docker Compose", fillcolor=lightyellow];
+
+    repo -> tf;
+    repo -> ansible;
+    repo -> compose;
+}
+
+subgraph cluster_vm {
+    label="Debian 13 - monitoring01";
+    color=blue;
+
+    docker [label="Docker Engine", fillcolor=lightcyan];
+
+    grafana [label="Grafana\n:3000", fillcolor=lightgreen];
+    prometheus [label="Prometheus\n:9090", fillcolor=lightgreen];
+    alertmanager [label="Alertmanager\n:9093", fillcolor=lightgreen];
+    blackbox [label="Blackbox Exporter\n:9115", fillcolor=lightgreen];
+
+    docker -> grafana;
+    docker -> prometheus;
+    docker -> alertmanager;
+    docker -> blackbox;
+}
+
+tf -> ansible;
+ansible -> docker;
+
+subgraph cluster_targets {
+    label="Monitored Infrastructure";
+    color=darkgreen;
+
+    docker_vm [label="ubuntu-docker\n192.168.2.51\nNode Exporter", fillcolor=lightgrey];
+
+    nextcloud_vm [label="nextcloud\n192.168.2.60\nNode Exporter", fillcolor=lightgrey];
+
+    future [label="Future Nodes\nNode Exporter", fillcolor=white];
+}
+
+prometheus -> docker_vm;
+prometheus -> nextcloud_vm;
+prometheus -> future;
+
+grafana -> prometheus;
+prometheus -> alertmanager;
+blackbox -> docker_vm;
+blackbox -> nextcloud_vm;
+
 }

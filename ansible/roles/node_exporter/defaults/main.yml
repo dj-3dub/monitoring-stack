@@ -1,0 +1,4 @@
+---
+node_exporter_package: prometheus-node-exporter
+node_exporter_service: prometheus-node-exporter
+node_exporter_port: "9100"
