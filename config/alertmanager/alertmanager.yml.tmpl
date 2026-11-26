@@ -1,0 +1,39 @@
+# Alertmanager config template. entrypoint.sh fills in the ${...} values from
+# .env each time the container starts. Lines ending in "# if-token" are only
+# kept when NTFY_TOKEN is set (for protected or self-hosted ntfy topics).
+
+route:
+  receiver: ntfy
+  group_by: [alertname, instance]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - receiver: ntfy-urgent
+      matchers: [severity="critical"]
+
+receivers:
+  # ntfy's built-in "alertmanager" template turns the webhook JSON into a
+  # readable push notification.
+  - name: ntfy
+    webhook_configs:
+      - url: "${NTFY_URL}/${NTFY_TOPIC}?template=alertmanager&priority=default&tags=warning"
+        send_resolved: true
+        http_config:                            # if-token
+          authorization:                        # if-token
+            credentials: "${NTFY_TOKEN}"        # if-token
+
+  - name: ntfy-urgent
+    webhook_configs:
+      - url: "${NTFY_URL}/${NTFY_TOPIC}?template=alertmanager&priority=urgent&tags=rotating_light"
+        send_resolved: true
+        http_config:                            # if-token
+          authorization:                        # if-token
+            credentials: "${NTFY_TOKEN}"        # if-token
+
+
+inhibit_rules:
+  # While a critical alert fires for an instance, hold back its warnings.
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: [instance]

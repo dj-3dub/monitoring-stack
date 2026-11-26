@@ -1,0 +1,73 @@
+extensions:
+  # Finds running containers through the Docker API.
+  docker_observer:
+    endpoint: unix:///var/run/docker.sock
+  # Persists log read positions so a restart doesn't resend or skip logs.
+  file_storage:
+    directory: /var/lib/otelcol
+    create_directory: true
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  # OTLP from your own applications.
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Starts a log reader for each container the observer finds, tagged with
+  # the container's name and image.
+  receiver_creator/docker_logs:
+    watch_observers: [docker_observer]
+    receivers:
+      filelog:
+        rule: type == "container"
+        config:
+          include:
+            - /var/lib/docker/containers/`container_id`/`container_id`-json.log
+          start_at: end
+          storage: file_storage
+          operators:
+            - type: container
+              format: docker
+              add_metadata_from_filepath: false
+        resource_attributes:
+          container.name: "`name`"
+          container.image.name: "`image`"
+          service.name: "`name`"
+
+processors:
+  batch:
+  resource_detection:
+    detectors: [env, system]
+    system:
+      hostname_sources: [os]
+
+exporters:
+  otlp_grpc/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlp_http/loki:
+    endpoint: http://loki:3100/otlp
+  otlp_http/prometheus:
+    endpoint: http://prometheus:9090/api/v1/otlp
+
+service:
+  extensions: [docker_observer, file_storage, health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resource_detection, batch]
+      exporters: [otlp_grpc/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [resource_detection, batch]
+      exporters: [otlp_http/prometheus]
+    logs:
+      receivers: [otlp, receiver_creator/docker_logs]
+      processors: [resource_detection, batch]
+      exporters: [otlp_http/loki]

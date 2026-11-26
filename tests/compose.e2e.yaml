@@ -1,0 +1,25 @@
+# Overrides for tests/e2e.sh: a local ntfy server receives the alerts, and no
+# ports are published on the host so the test can't clash with anything.
+services:
+  ntfy:
+    image: binwiederhier/ntfy:v2.38.2
+    command: ["serve"]
+    networks: [monitoring]
+  # Renders dashboards to PNG for the screenshot check.
+  renderer:
+    image: grafana/grafana-image-renderer:v5.12.12
+    networks: [monitoring]
+    environment:
+      AUTH_TOKEN: e2e-renderer-token
+  grafana:
+    ports: !reset []
+    environment:
+      GF_RENDERING_SERVER_URL: http://renderer:8081/render
+      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
+      GF_RENDERING_RENDERER_TOKEN: e2e-renderer-token
+  prometheus:
+    ports: !reset []
+  alertmanager:
+    ports: !reset []
+  otel-collector:
+    ports: !reset []

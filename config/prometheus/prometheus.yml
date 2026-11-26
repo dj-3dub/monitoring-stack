@@ -1,0 +1,73 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  # Attached to every alert so notifications say which machine they came from.
+  # HOST_NAME is set in .env by `make setup`.
+  external_labels:
+    host: ${HOST_NAME}
+
+rule_files:
+  - /etc/prometheus/rules/*.rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  # The machine this stack runs on.
+  - job_name: node-exporter
+    static_configs:
+      - targets:
+          - host.docker.internal:9100
+        labels:
+          # Prometheus only expands ${...} in external_labels, so the local
+          # machine is labelled "localhost"; alerts also carry host=<name>.
+          instance: localhost
+    # Other machines running node-exporter. Copy targets/nodes.yml.example to
+    # targets/nodes.yml and list them there; Prometheus picks up changes live.
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/*.yml
+
+  - job_name: cadvisor
+    static_configs:
+      - targets:
+          - cadvisor:8080
+
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
+
+  - job_name: alertmanager
+    static_configs:
+      - targets:
+          - alertmanager:9093
+
+  - job_name: blackbox
+    static_configs:
+      - targets:
+          - blackbox-exporter:9115
+
+  # HTTP health checks run through the Blackbox Exporter.
+  # Add any URL you want checked (inside or outside this stack).
+  - job_name: blackbox_http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://grafana:3000/api/health
+          - http://prometheus:9090/-/healthy
+          - http://alertmanager:9093/-/healthy
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - source_labels: [__param_module]
+        target_label: module
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

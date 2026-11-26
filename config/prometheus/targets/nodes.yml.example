@@ -1,0 +1,8 @@
+# Extra machines to monitor. Copy this file to nodes.yml (same folder) and
+# edit it. Each machine needs node-exporter listening on port 9100.
+# Prometheus reloads this file automatically; no restart needed.
+- targets:
+    - 192.168.1.10:9100
+    - 192.168.1.11:9100
+  labels:
+    group: homelab

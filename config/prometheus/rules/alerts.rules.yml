@@ -1,0 +1,80 @@
+groups:
+  - name: availability
+    rules:
+      - alert: HostDown
+        expr: up{job="node-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host {{ $labels.instance }} is down"
+          description: "node-exporter on {{ $labels.instance }} has been unreachable from {{ $externalLabels.host }} for 2 minutes."
+
+      - alert: MonitoringComponentDown
+        expr: up{job=~"prometheus|alertmanager|cadvisor|blackbox"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} is down on {{ $externalLabels.host }}"
+          description: "Prometheus has not been able to scrape {{ $labels.job }} ({{ $labels.instance }}) for 2 minutes."
+
+      - alert: BlackboxProbeFailing
+        expr: probe_success == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Health check failing: {{ $labels.instance }}"
+          description: "The {{ $labels.module }} probe to {{ $labels.instance }} has failed for 2 minutes."
+
+  - name: resources
+    rules:
+      - alert: HighCPU
+        expr: instance:node_cpu_utilization:percent > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+          description: "CPU usage has been above 85% for 10 minutes (now {{ $value | printf \"%.0f\" }}%)."
+
+      - alert: HighMemory
+        expr: instance:node_memory_utilization:percent > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory on {{ $labels.instance }}"
+          description: "Memory usage has been above 90% for 10 minutes (now {{ $value | printf \"%.0f\" }}%)."
+
+      - alert: DiskFillingUp
+        expr: instance:node_filesystem_usage:percent > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk {{ $labels.mountpoint }} on {{ $labels.instance }} is {{ $value | printf \"%.0f\" }}% full"
+          description: "Filesystem {{ $labels.mountpoint }} has been above 85% for 10 minutes."
+
+      - alert: DiskAlmostFull
+        expr: instance:node_filesystem_usage:percent > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk {{ $labels.mountpoint }} on {{ $labels.instance }} is {{ $value | printf \"%.0f\" }}% full"
+          description: "Filesystem {{ $labels.mountpoint }} is above 95%. Services may start failing."
+
+      # Warns before the threshold alerts fire, based on the last 6 hours' trend.
+      - alert: DiskWillFillIn24h
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|devtmpfs|ramfs|overlay|squashfs|nsfs|tracefs|fuse.lxcfs"}[6h], 24 * 3600) < 0
+          and on (instance, mountpoint)
+          instance:node_filesystem_usage:percent > 50
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk {{ $labels.mountpoint }} on {{ $labels.instance }} will fill within 24 hours"
+          description: "At the current rate of growth, {{ $labels.mountpoint }} runs out of space within a day."

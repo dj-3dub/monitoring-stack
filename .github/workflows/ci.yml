@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint configs and scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: make lint
+
+  rules:
+    name: Alert rule unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: make test-rules
+
+  e2e:
+    name: End-to-end (stack, alerts, backup)
+    needs: [lint, rules]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - run: make test-e2e
+        env:
+          SCREENSHOT_DIR: ${{ runner.temp }}/screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dashboard-screenshots
+          path: ${{ runner.temp }}/screenshots
+          if-no-files-found: ignore
+
+  terraform:
+    name: Terraform deploy to a throwaway host
+    needs: [lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - run: make test-terraform

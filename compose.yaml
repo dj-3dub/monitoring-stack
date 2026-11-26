@@ -1,0 +1,177 @@
+name: monitoring-stack
+
+# Shared defaults: restart on failure and cap container logs so a chatty
+# service can't fill the disk this stack is meant to be watching.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-defaults: &defaults
+  restart: unless-stopped
+  logging: *logging
+  networks:
+    - monitoring
+
+services:
+  grafana:
+    <<: *defaults
+    image: grafana/grafana:13.3.2
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Run "make setup" to create .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      # Open the Host overview dashboard after login.
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/host-overview.json
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - prometheus
+
+  prometheus:
+    <<: *defaults
+    image: prom/prometheus:v3.16.0
+    ports:
+      # Prometheus has no authentication, so it is only published on localhost
+      # by default. Set ADMIN_BIND_ADDRESS=0.0.0.0 in .env to reach it from your LAN.
+      - "${ADMIN_BIND_ADDRESS:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090"
+    environment:
+      HOST_NAME: ${HOST_NAME:-monitoring-host}
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-15d}"
+      - "--storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-10GB}"
+      - "--web.enable-lifecycle"
+      # Accept OTLP metrics forwarded by the OTel Collector.
+      - "--web.enable-otlp-receiver"
+    volumes:
+      - ./config/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    extra_hosts:
+      # node-exporter runs on the host network; this name points at the host.
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  alertmanager:
+    <<: *defaults
+    image: prom/alertmanager:v0.35.1
+    ports:
+      - "${ADMIN_BIND_ADDRESS:-127.0.0.1}:${ALERTMANAGER_PORT:-9093}:9093"
+    environment:
+      NTFY_URL: ${NTFY_URL:-https://ntfy.sh}
+      NTFY_TOPIC: ${NTFY_TOPIC:?Run "make setup" to create .env}
+      NTFY_TOKEN: ${NTFY_TOKEN:-}
+    # Alertmanager can't read environment variables, so entrypoint.sh renders
+    # the ntfy settings from .env into its config before starting it.
+    entrypoint: ["/bin/sh", "/etc/alertmanager/entrypoint.sh"]
+    volumes:
+      - ./config/alertmanager:/etc/alertmanager:ro
+      - alertmanager-data:/alertmanager
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  node-exporter:
+    image: prom/node-exporter:v1.13.1
+    restart: unless-stopped
+    logging: *logging
+    # Host network and PID namespace so the metrics describe the host itself
+    # (including its real network interfaces), not this container.
+    network_mode: host
+    pid: host
+    command:
+      - "--path.rootfs=/host"
+      - "--web.listen-address=${NODE_EXPORTER_LISTEN:-:9100}"
+    volumes:
+      - /:/host:ro,rslave
+
+  cadvisor:
+    <<: *defaults
+    image: ghcr.io/google/cadvisor:v0.57.0
+    privileged: true
+    devices:
+      - /dev/kmsg
+    command:
+      - "--docker_only=true"
+      - "--housekeeping_interval=15s"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+  blackbox-exporter:
+    <<: *defaults
+    image: prom/blackbox-exporter:v0.29.1
+    volumes:
+      - ./config/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+
+  # The single telemetry pipeline: collects every container's logs on this
+  # host, and accepts OTLP (traces, metrics, logs) from your own apps.
+  # Traces go to Tempo, metrics to Prometheus, logs to Loki.
+  otel-collector:
+    <<: *defaults
+    image: otel/opentelemetry-collector-contrib:0.166.0
+    # Root is needed to read Docker's log files (owned by root, mode 0640).
+    user: "0:0"
+    command: ["--config=/etc/otelcol-contrib/config.yml"]
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${OTLP_GRPC_PORT:-4317}:4317"
+      - "${BIND_ADDRESS:-0.0.0.0}:${OTLP_HTTP_PORT:-4318}:4318"
+    volumes:
+      - ./config/otel/otel-collector-config.yml:/etc/otelcol-contrib/config.yml:ro
+      # Container discovery (names, images) and their log files.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      # Remembers how far each log file has been read, across restarts.
+      - otel-data:/var/lib/otelcol
+    depends_on:
+      - loki
+      - tempo
+      - prometheus
+
+  loki:
+    <<: *defaults
+    image: grafana/loki:3.7.10
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ./config/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki-data:/loki
+    # No healthcheck: the Loki image has no shell or HTTP client to run one.
+
+  tempo:
+    <<: *defaults
+    image: grafana/tempo:3.1.1
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    volumes:
+      - ./config/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+
+networks:
+  monitoring:
+
+volumes:
+  grafana-data:
+  prometheus-data:
+  alertmanager-data:
+  loki-data:
+  tempo-data:
+  otel-data:

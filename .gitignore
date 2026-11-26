@@ -1,0 +1,19 @@
+# Secrets and local settings
+.env
+.env.before-restore
+config/prometheus/targets/*.yml
+
+# Backups (contain .env secrets)
+backups/
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfvars
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform.tfstate.lock.info
+
+# OS/editor
+.DS_Store
+*.swp
+*.tmp

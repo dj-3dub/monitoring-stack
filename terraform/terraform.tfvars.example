@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and edit. Only `host` and `ssh_user` are required.
+
+host     = "192.168.1.50"
+ssh_user = "ubuntu"
+
+# ssh_private_key_path = "~/.ssh/id_ed25519"   # "" = use your SSH agent
+# host_name            = "homelab-01"          # shown in alerts
+# timezone             = "America/Chicago"
+
+# Alerts. Leave ntfy_topic unset to generate a private random topic.
+# ntfy_url   = "https://ntfy.sh"
+# ntfy_topic = "my-long-random-topic"
+
+# Prometheus and Alertmanager listen on localhost only by default.
+# admin_bind_address = "0.0.0.0"

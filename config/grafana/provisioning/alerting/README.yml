@@ -1,0 +1,3 @@
+# Grafana-managed alert rules would go here. This stack alerts through
+# Prometheus + Alertmanager instead (config/prometheus/rules/).
+apiVersion: 1
